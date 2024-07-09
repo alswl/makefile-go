@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
-# This script is used to bump the version of the operator.
-# It uses semtag to bump the version.
+# This script is used to bump the version of the sub module.
 #
 # github.com/alswl/makefile-go
 #
 # Author: alswl
-# Version: v0.2.1
+# Version: 0.2.2
 #
-# Usage: hack/bump.sh <stage> <scope> <dryrun>
+# Usage: hack/bump-sub-module.sh <sub> <next> <dryrun>
 # stage: final, alpha, beta, candidate
 # scope: major, minor, patch, final
 #
@@ -21,16 +20,20 @@ pushd "$(dirname "$0")/.." > /dev/null
 
 set -e
 
-bump_stage=$1
-bump_scope=$2
+sub=$1
+next=$2
 bump_dry_run=$3
 
-if [ -z "$bump_stage" ]; then
-  echo "bump stage is required"
+if [ -z "$sub" ]; then
+  echo "sub mod is required"
   exit 1
 fi
-if [ -z "$bump_scope" ]; then
-  echo "bump scope is required"
+if [ ! -d "$sub" ]; then
+  echo "sub mod $sub does not exist"
+  exit 1
+fi
+if [ -z "$next" ]; then
+  echo "next is required"
   exit 1
 fi
 if [ -z "$bump_dry_run" ]; then
@@ -38,7 +41,6 @@ if [ -z "$bump_dry_run" ]; then
   exit 1
 fi
 
-next=$(semtag "$bump_stage" -s "$bump_scope" -f -o)
 echo "next version: $next"
 
 # dry run
@@ -47,14 +49,26 @@ if [ "$bump_dry_run" = "true" ]; then
   exit 0
 fi
 
-# bump and tag
+# 1. bump VERSION
 echo "dryrun: false"
-# VERSION in file always has the -dev suffix
-echo "${next}-dev" > VERSION
-git add VERSION
+echo "${next}" > "${sub}"/VERSION
+git add "${sub}"/VERSION
 git commit -m "chore: Bump version to $next"
 
-# git tag did not contains dev suffix
-semtag "$bump_stage" -s "$bump_scope"
+# 2. git tag
+git tag "${sub}/${next}"
+
+# 3. modified VERSION in stage
+# VERSION file always has the -dev suffix
+echo "${next}-dev" > "${sub}"/VERSION
+git add "${sub}"/VERSION
+
+# 4. prompt
+echo "# Your should update your local version file to dev"
+echo "# Run: "
+echo "git push origin ${sub}/${next}"
+echo "vim ${sub}/VERSION"
+echo 'git commit -m "chore: new dev version"'
+echo "git push"
 
 popd > /dev/null
