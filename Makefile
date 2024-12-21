@@ -78,4 +78,4 @@ include hack/makefile-go/build.mk
 include hack/makefile-go/test.mk
 include hack/makefile-go/gen.mk
 include hack/makefile-go/container.mk
-include hack/makefile-go/version.mk.mk
+include hack/makefile-go/version.mk
