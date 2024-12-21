@@ -5,9 +5,7 @@ container: ## Build containers
 	  for registry in $(REGISTRIES); do                          \
 	    image=$(IMAGE_PREFIX)$${target}$(IMAGE_SUFFIX);          \
 	    docker build -t $${registry}$${image}:$(VERSION)         \
-	      --platform linux/amd64                                 \
 	      --build-arg COMMIT=$(COMMIT)                           \
-	      --build-arg CGO_ENABLED=$(CGO_ENABLED)                 \
 	      --progress=plain                                       \
 	      -f $(BUILD_DIR)/$${target}/Dockerfile .;               \
 	  done                                                       \

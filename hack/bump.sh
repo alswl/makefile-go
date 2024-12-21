@@ -84,3 +84,4 @@ git add .
 git commit -m "chore: prepare next version $next-dev"
 
 popd > /dev/null
+

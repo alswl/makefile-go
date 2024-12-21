@@ -16,9 +16,9 @@
 SHELL := /bin/bash
 NOW_SHORT := $(shell date +%Y%m%d%H%M)
 
-PROJECT := go-toodledo
+PROJECT := your-project
 # Target binaries. You can build multiple binaries for a single project.
-TARGETS := toodledo tt
+TARGETS := your-cmd-app-1 your-cmd-app-2
 
 # Container registries.
 REGISTRIES ?= ""
@@ -31,7 +31,7 @@ IMAGE_PREFIX ?= $(strip )
 IMAGE_SUFFIX ?= $(strip )
 
 # This repo's root import path (under GOPATH).
-ROOT := github.com/alswl/go-toodledo
+ROOT := github.com/your/project
 
 # Project main package location (can be multiple ones).
 CMD_DIR := ./cmd
@@ -50,17 +50,32 @@ COMMIT := $(COMMIT)$(shell [[ -z $$(git status -s) ]] || echo '-dirty')
 COMMIT := $(if $(COMMIT),$(COMMIT), $${COMMIT})
 COMMIT := $(if $(COMMIT),$(COMMIT),"Unknown")
 
-DEFAULT_BUMP_STAGE := final # final, alpha, beta, candidate
-DEFAULT_BUMP_SCOPE := minor # major, minor, patch
-DEFAULT_BUMP_DRY_RUN := true # true, false
-
-# Current version of the project.
-VERSION_IN_FILE = $(shell cat VERSION)
+## Current version of the project.
+MAJOR_VERSION = 0
+MINOR_VERSION = 0
+PATCH_VERSION = 0
 BUILD_VERSION = $(COMMIT)
 GO_MOD_VERSION = $(shell cat go.mod | sha256sum | cut -c-6)
 GOOS = $(shell go env GOOS)
 GOARCH = $(shell go env GOARCH)
-VERSION ?= $(VERSION_IN_FILE)-$(BUILD_VERSION)
+VERSION ?= v$(MAJOR_VERSION).$(MINOR_VERSION).$(PATCH_VERSION)-$(BUILD_VERSION)
 
-UT_COVER_PACKAGES := $(shell go list ./pkg/... |grep -Ev 'pkg/clientsets|pkg/dal|pkg/models|pkg/version|pkg/injector')
+# Current version of the project.
+VERSION_IN_FILE = $(shell cat VERSION)
 
+UT_COVER_PACKAGES := $(shell go list ./pkg/... | grep -Ev 'pkg/clientsets|pkg/dal|pkg/models|pkg/version|pkg/injector')
+
+.PHONY: all
+all: fmt test build
+
+include hack/makefile-go/_git.mk
+
+.PHONY: install-dev-tools
+install-dev-tools:
+	echo ''
+
+include hack/makefile-go/build.mk
+include hack/makefile-go/test.mk
+include hack/makefile-go/gen.mk
+include hack/makefile-go/container.mk
+include hack/makefile-go/version.mk
