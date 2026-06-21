@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# Post-actions hook for bump.sh. Sync version to external config files.
+# github.com/alswl/makefile-go
+#
+# Author: alswl
+# Version: 0.1.0
 
 # cd root of the repo
 pushd "$(dirname "$0")/.." > /dev/null

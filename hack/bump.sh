@@ -1,26 +1,29 @@
 #!/usr/bin/env bash
-# This script is used to bump the version of the operator. It uses semtag to bump the version.
+# Bump project version using semtag. Optionally generates CHANGELOG via git-cliff.
 # github.com/alswl/makefile-go
 #
 # Author: alswl
-# Version: v0.3.1
+# Version: 0.5.0
 #
-# Usage: hack/bump.sh [--stage <stage>] [--scope <scope>] [--dry-run <dry-run>] [--post-actions-script <post-actions.sh>]
-# stage: final, alpha, beta, candidate
-# scope: major, minor, patch, final
-#
-# 发版之前打 tag，会自动写入 VERSION 文件，并生成 tag
-# 写入 VERSION 文件会先使用发布版本 push tag
-# 推送 tag 之后会使用下一个版本 + `-dev` 作为新版本
+# Usage: hack/bump.sh [--stage <stage>] [--scope <scope>] [--dry-run <dry-run>] [--push <push>] [--post-actions-script <post-actions.sh>]
+#   --stage:    final, alpha, beta, candidate (default: final)
+#   --scope:    major, minor, patch (default: major)
+#   --dry-run:  true|false (default: true)
+#   --push:     true|false (default: false)
+#   --post-actions-script: path to script run after VERSION write
 
-# cd root of the repo
 pushd "$(dirname "$0")/.." > /dev/null
 set -e
 
 bump_stage="final"
 bump_scope="major"
 bump_dry_run="true"
+bump_push="false"
 post_actions_script=""
+
+has_git_cliff() {
+  command -v git-cliff >/dev/null 2>&1
+}
 
 function runPostActions {
   if [ -n "$post_actions_script" ]; then
@@ -31,7 +34,6 @@ function runPostActions {
   fi
 }
 
-# shift params
 while [ $# -gt 0 ]; do
   case "$1" in
     --stage)
@@ -46,6 +48,10 @@ while [ $# -gt 0 ]; do
       bump_dry_run=$2
       shift
       ;;
+    --push)
+      bump_push=$2
+      shift
+      ;;
     --post-actions-script)
       post_actions_script=$2
       shift
@@ -58,30 +64,102 @@ while [ $# -gt 0 ]; do
   shift
 done
 
-next=$(semtag "$bump_stage" -s "$bump_scope" -f -o)
-echo "next version: $next"
+# Auto-detect post-actions script if not explicitly specified
+if [ -z "$post_actions_script" ] && [ -f "./hack/bump-post-actions.sh" ]; then
+  post_actions_script="./hack/bump-post-actions.sh"
+fi
 
-# dry run
+next=$(semtag "$bump_stage" -s "$bump_scope" -f -o)
+current=$(cat VERSION 2>/dev/null || echo "unknown")
+
 if [ "$bump_dry_run" = "true" ]; then
-  echo "dryrun: true"
+  echo ""
+  echo "=============================="
+  echo "  Version Bump Preview"
+  echo "=============================="
+  echo "  Current version : $current"
+  echo "  Next version    : $next"
+  echo "  Scope           : $bump_scope"
+  echo "  Stage           : $bump_stage"
+  echo "------------------------------"
+  echo "  Actions (if DRY_RUN=false):"
+  echo "    1. Write $next to VERSION"
+  if has_git_cliff; then
+    echo "    2. Generate CHANGELOG.md (via git cliff)"
+  fi
+  echo "    3. git commit \"chore: Bump version to $next\""
+  echo "    4. git tag (via semtag $bump_stage -s $bump_scope)"
+  if [ -n "$post_actions_script" ]; then
+    echo "    *. Run post-actions: $post_actions_script"
+  fi
+  echo "    5. Write ${next}-dev to VERSION"
+  echo "    6. git commit \"chore: prepare next version ${next}-dev\""
+  echo "=============================="
+  if has_git_cliff; then
+    echo ""
+    echo "------------------------------"
+    echo "  Changelog Preview (--latest)"
+    echo "------------------------------"
+    git cliff -t "$next" --latest 2>/dev/null || echo "  (git cliff failed, skipped)"
+    echo "=============================="
+  else
+    echo "  (git-cliff not installed, changelog preview skipped)"
+  fi
+  echo ""
+  echo "  To execute, re-run with: DRY_RUN=false"
+  echo ""
   exit 0
 fi
 
-# bump and tag
-echo "dryrun: false"
-# VERSION in file always has the -dev suffix
+# release version
 echo "${next}" > VERSION
 runPostActions
+
+if has_git_cliff; then
+  echo "Generating CHANGELOG.md..."
+  git cliff -t "$next" -o CHANGELOG.md
+else
+  echo "(git-cliff not installed, skipping CHANGELOG generation)"
+fi
+
 git add .
 git commit -m "chore: Bump version to $next"
-# git tag did not contains dev suffix
 semtag "$bump_stage" -s "$bump_scope"
 
-# next version
+# dev version
 echo "${next}-dev" > VERSION
 runPostActions
 git add .
 git commit -m "chore: prepare next version $next-dev"
 
-popd > /dev/null
+# push
+tag=$(git describe --tags --abbrev=0)
 
+echo ""
+echo "=============================="
+echo "  Release Complete"
+echo "=============================="
+echo "  Tag: $tag"
+echo ""
+echo "  Push commands:"
+echo "    git push origin $tag"
+echo "    git push"
+echo "=============================="
+
+if [ "$bump_push" = "true" ]; then
+  echo ""
+  echo "Pushing..."
+  git push origin "$tag"
+  git push
+  echo "Done."
+elif [ -t 0 ]; then
+  echo ""
+  read -p "Push now? (y/N) " answer
+  if [ "$answer" = "y" ] || [ "$answer" = "Y" ]; then
+    git push origin "$tag"
+    git push
+    echo "Done."
+  fi
+fi
+
+popd > /dev/null

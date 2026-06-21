@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# Install development tools required by the Makefile.
+# github.com/alswl/makefile-go
+#
+# Author: alswl
+# Version: 0.1.0
 
 go install golang.org/x/tools/cmd/goimports@latest
 
