@@ -5,20 +5,23 @@
 # Author: alswl
 # Version: 0.5.0
 #
-# Usage: hack/bump.sh [--stage <stage>] [--scope <scope>] [--dry-run <dry-run>] [--push <push>] [--post-actions-script <post-actions.sh>]
+# Usage: hack/bump.sh [--mode <mode>] [--stage <stage>] [--scope <scope>] [--dry-run <dry-run>] [--push <push>] [--post-actions-script <post-actions.sh>]
+#   --mode:     release, prepare (default: release)
 #   --stage:    final, alpha, beta, candidate (default: final)
 #   --scope:    major, minor, patch (default: major)
 #   --dry-run:  true|false (default: true)
 #   --push:     true|false (default: false)
 #   --post-actions-script: path to script run after VERSION write
 
-pushd "$(dirname "$0")/.." > /dev/null
+script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd) || exit 1
+pushd "${BUMP_PROJECT_ROOT:-$script_dir/..}" > /dev/null || exit 1
 set -e
 
 bump_stage="final"
 bump_scope="major"
 bump_dry_run="true"
 bump_push="false"
+bump_mode="${BUMP_MODE:-release}"
 post_actions_script=""
 
 has_git_cliff() {
@@ -36,6 +39,10 @@ function runPostActions {
 
 while [ $# -gt 0 ]; do
   case "$1" in
+    --mode)
+      bump_mode=${2:?--mode requires a value}
+      shift
+      ;;
     --stage)
       bump_stage=$2
       shift
@@ -68,6 +75,15 @@ done
 if [ -z "$post_actions_script" ] && [ -f "./hack/bump-post-actions.sh" ]; then
   post_actions_script="./hack/bump-post-actions.sh"
 fi
+
+case "$bump_mode" in
+  prepare)
+    source "$script_dir/bump-prepare.sh"
+    exit
+    ;;
+  release) ;;
+  *) printf 'Unknown BUMP_MODE: %s\n' "$bump_mode" >&2; exit 1 ;;
+esac
 
 next=$(semtag "$bump_stage" -s "$bump_scope" -f -o)
 current=$(cat VERSION 2>/dev/null || echo "unknown")
